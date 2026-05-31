@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 import Head from 'next/head'
-import '../styles/globals.css'
-
 export default function Viewer() {
   const [state, setState] = useState(null)
   const [tab, setTab] = useState('bracket')

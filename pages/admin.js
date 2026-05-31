@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 import Head from 'next/head'
-import '../styles/globals.css'
-
 const TEAM_NAMES = [
   'The Stripling Warriors',
   'The Liahona Lakers',
