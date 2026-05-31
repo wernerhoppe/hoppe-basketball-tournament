@@ -122,7 +122,7 @@ function SetupTab({ state, act, newPlayerName, setNewPlayerName, unassignedPlaye
         <div className="text-muted" style={{ fontSize: '0.8rem' }}>{state.players.length} players × $2</div>
       </div>
 
-      {/* Add players */}
+      {/* Add players — always visible */}
       <div className="card">
         <div className="oswald mb-8" style={{ fontSize: '0.8rem', color: 'var(--muted)', letterSpacing: '0.1em' }}>ADD PLAYERS</div>
         <div className="row">
@@ -138,7 +138,6 @@ function SetupTab({ state, act, newPlayerName, setNewPlayerName, unassignedPlaye
           </button>
         </div>
 
-        {/* All players */}
         {state.players.length > 0 && (
           <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {state.players.map(p => (
@@ -155,7 +154,7 @@ function SetupTab({ state, act, newPlayerName, setNewPlayerName, unassignedPlaye
         )}
       </div>
 
-      {/* Teams */}
+      {/* Teams — always visible, rename + move players works anytime */}
       <div className="row-between mb-8">
         <div className="oswald text-muted" style={{ fontSize: '0.75rem', letterSpacing: '0.15em' }}>TEAMS</div>
         <button className="btn btn-outline btn-sm" onClick={addTeam} disabled={loading}>+ ADD TEAM</button>
@@ -187,11 +186,13 @@ function SetupTab({ state, act, newPlayerName, setNewPlayerName, unassignedPlaye
           {canStart ? '🏀 START TOURNAMENT' : 'Need at least 2 teams with players'}
         </button>
       ) : (
-        <div>
-          <div className="text-center text-orange mb-8">Tournament is live!</div>
+        <div className="card" style={{ border: '1px solid var(--red)', background: 'rgba(231,76,60,0.08)' }}>
+          <div className="oswald text-muted mb-8" style={{ fontSize: '0.75rem', letterSpacing: '0.1em' }}>DANGER ZONE</div>
+          <div className="text-muted mb-8" style={{ fontSize: '0.85rem' }}>This will erase all scores, games, and bracket progress.</div>
           <button
-            className="btn btn-danger btn-full btn-sm"
-            onClick={() => { if (confirm('Reset everything? This cannot be undone.')) act('RESET') }}
+            className="btn btn-danger btn-full"
+            onClick={() => { if (confirm('Reset everything? All scores and bracket progress will be lost.')) act('RESET') }}
+            disabled={loading}
           >
             RESET TOURNAMENT
           </button>
