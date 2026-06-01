@@ -32,13 +32,20 @@ export default function Viewer() {
       <Head>
         <title>Hoppe Family Tournament 🏀</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700;900&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
       </Head>
 
       <div className="header">
-        <h1>🏀 Hoppe Family Tournament</h1>
-        <div className="prize-badge">Prize Pot: ${prizePool}</div>
-        {state.phase === 'bracket' && <div style={{ marginTop: 6 }}><span className="live-dot" /> <span style={{ color: '#8888aa', fontSize: '0.8rem' }}>LIVE</span></div>}
+        <div className="header-top">
+          <span className="espn-logo">ESPN</span>
+          <span style={{ color: 'white', fontSize: '0.75rem', fontFamily: 'Roboto Condensed, sans-serif', letterSpacing: '0.1em', fontWeight: 700 }}>HOPPE FAMILY CLASSIC</span>
+          {state.phase === 'bracket' && <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><span className="live-dot" /><span style={{ color: 'white', fontSize: '0.7rem', fontFamily: 'Roboto Condensed, sans-serif', fontWeight: 700 }}>LIVE</span></span>}
+          {state.phase !== 'bracket' && <span style={{ width: 40 }} />}
+        </div>
+        <div className="header-main">
+          <h1>🏀 Hoppe Family Tournament</h1>
+          <div className="prize-badge">Prize Pot: ${prizePool}</div>
+        </div>
       </div>
 
       <div className="container">
