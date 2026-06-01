@@ -262,6 +262,34 @@ export default async function handler(req, res) {
     }
 
     case 'RESET': {
+      // Auto-save to history if tournament was completed
+      if (state.phase === 'complete' && state.championTeamId) {
+        const history = await kv.get('tournament:history') || []
+        const allGames = [...(state.bracket.semifinals || []), ...(state.bracket.finals || [])]
+        // Build player stats from logs
+        const statsMap = {}
+        allGames.forEach(game => {
+          game.log.forEach(entry => {
+            if (!entry.scorerId) return
+            if (!statsMap[entry.scorerId]) {
+              statsMap[entry.scorerId] = { scorerId: entry.scorerId, scorerName: entry.scorerName, points: 0, twos: 0, threes: 0 }
+            }
+            if (entry.points === 2) { statsMap[entry.scorerId].points += 2; statsMap[entry.scorerId].twos++ }
+            if (entry.points === 3) { statsMap[entry.scorerId].points += 3; statsMap[entry.scorerId].threes++ }
+          })
+        })
+        const snapshot = {
+          id: Date.now(),
+          date: new Date().toISOString(),
+          champion: state.teams.find(t => t.id === state.championTeamId)?.name || 'Unknown',
+          players: state.players,
+          teams: state.teams,
+          bracket: state.bracket,
+          playerStats: Object.values(statsMap).sort((a, b) => b.points - a.points),
+          prizePool: state.players.length * 2
+        }
+        await kv.set('tournament:history', [snapshot, ...history].slice(0, 20))
+      }
       state = { ...DEFAULT_STATE }
       break
     }

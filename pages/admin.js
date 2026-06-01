@@ -102,6 +102,7 @@ export default function Admin() {
         <div className="tabs mt-8">
           <button className={`tab${tab === 'setup' ? ' active' : ''}`} onClick={() => setTab('setup')}>SETUP</button>
           <button className={`tab${tab === 'score' ? ' active' : ''}`} onClick={() => setTab('score')}>SCORE</button>
+          <button className={`tab${tab === 'stats' ? ' active' : ''}`} onClick={() => setTab('stats')}>STATS</button>
           <button className={`tab${tab === 'bracket' ? ' active' : ''}`} onClick={() => setTab('bracket')}>BRACKET</button>
         </div>
 
@@ -121,6 +122,7 @@ export default function Admin() {
           <ScoreTab state={state} act={act} loading={loading} muted={muted} />
         )}
 
+        {tab === 'stats' && <AdminStatsTab state={state} />}
         {tab === 'bracket' && (
           <BracketAdminTab state={state} act={act} loading={loading} />
         )}
@@ -505,6 +507,9 @@ function GameScorer({ game, state, act, loading, muted }) {
         )}
       </div>
 
+      {/* Game Timer */}
+      {!isComplete && <GameTimer gameId={game.id} />}
+
       {/* Per-player scoring */}
       {!isComplete && (
         <>
@@ -570,6 +575,178 @@ function GameScorer({ game, state, act, loading, muted }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── GAME TIMER ──────────────────────────────────────────────────────────────
+
+function GameTimer({ gameId }) {
+  const [elapsed, setElapsed] = useState(0)       // ms
+  const [running, setRunning] = useState(false)
+  const [status, setStatus] = useState('idle')    // idle | running | paused | timeout | halftime
+  const [timeoutLeft, setTimeoutLeft] = useState(0)
+  const intervalRef = useRef(null)
+  const timeoutRef = useRef(null)
+  const startedAtRef = useRef(null)
+  const baseElapsedRef = useRef(0)
+
+  // Reset when game changes
+  useEffect(() => {
+    clearInterval(intervalRef.current)
+    clearTimeout(timeoutRef.current)
+    setElapsed(0); setRunning(false); setStatus('idle'); setTimeoutLeft(0)
+    startedAtRef.current = null; baseElapsedRef.current = 0
+  }, [gameId])
+
+  const start = () => {
+    startedAtRef.current = Date.now()
+    setRunning(true); setStatus('running')
+    intervalRef.current = setInterval(() => {
+      setElapsed(baseElapsedRef.current + (Date.now() - startedAtRef.current))
+    }, 100)
+  }
+
+  const pause = () => {
+    clearInterval(intervalRef.current)
+    baseElapsedRef.current += Date.now() - startedAtRef.current
+    setElapsed(baseElapsedRef.current)
+    setRunning(false); setStatus('paused')
+  }
+
+  const callTimeout = () => {
+    if (running) pause()
+    setStatus('timeout'); setTimeoutLeft(30)
+    let left = 30
+    timeoutRef.current = setInterval(() => {
+      left -= 1; setTimeoutLeft(left)
+      if (left <= 0) {
+        clearInterval(timeoutRef.current)
+        setStatus('paused')
+      }
+    }, 1000)
+  }
+
+  const callHalftime = () => {
+    if (running) pause()
+    setStatus('halftime')
+  }
+
+  const resume = () => {
+    clearInterval(timeoutRef.current)
+    start()
+  }
+
+  const reset = () => {
+    clearInterval(intervalRef.current)
+    clearInterval(timeoutRef.current)
+    baseElapsedRef.current = 0
+    setElapsed(0); setRunning(false); setStatus('idle'); setTimeoutLeft(0)
+  }
+
+  const fmt = (ms) => {
+    const totalSec = Math.floor(ms / 1000)
+    const m = Math.floor(totalSec / 60).toString().padStart(2, '0')
+    const s = (totalSec % 60).toString().padStart(2, '0')
+    return `${m}:${s}`
+  }
+
+  const statusColor = { running: 'var(--green)', paused: 'var(--muted)', timeout: 'var(--espn-red)', halftime: 'var(--gold)', idle: 'var(--muted)' }
+
+  return (
+    <div className="card" style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div className="section-label">Game Timer</div>
+        {status !== 'idle' && (
+          <span style={{ fontFamily: 'Roboto Condensed, sans-serif', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.1em', color: statusColor[status] }}>
+            {status === 'running' ? '● RUNNING' : status === 'timeout' ? `⏸ TIMEOUT ${timeoutLeft}s` : status === 'halftime' ? '⏸ HALFTIME' : '⏸ PAUSED'}
+          </span>
+        )}
+      </div>
+
+      {/* Clock display */}
+      <div style={{ textAlign: 'center', fontFamily: 'Roboto Condensed, sans-serif', fontSize: '3rem', fontWeight: 900, letterSpacing: '0.05em', color: status === 'running' ? 'var(--white)' : 'var(--muted)', marginBottom: 12 }}>
+        {fmt(elapsed)}
+      </div>
+
+      {/* Controls */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+        {!running ? (
+          <button className="btn btn-primary btn-sm" onClick={status === 'idle' ? start : resume} style={{ gridColumn: 'span 1' }}>
+            {status === 'idle' ? '▶ START' : '▶ RESUME'}
+          </button>
+        ) : (
+          <button className="btn btn-outline btn-sm" onClick={pause}>⏸ PAUSE</button>
+        )}
+        <button className="btn btn-outline btn-sm" onClick={callTimeout} disabled={status === 'timeout'} style={{ color: 'var(--espn-red)', borderColor: 'var(--espn-red)' }}>
+          T.O.
+        </button>
+        <button className="btn btn-outline btn-sm" onClick={callHalftime} style={{ color: 'var(--gold)', borderColor: 'var(--gold)' }}>
+          HALF
+        </button>
+        <button className="btn btn-outline btn-sm" onClick={reset} style={{ color: 'var(--muted)' }}>
+          RESET
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── ADMIN STATS TAB ─────────────────────────────────────────────────────────
+
+function AdminStatsTab({ state }) {
+  const allGames = [...(state.bracket.semifinals || []), ...(state.bracket.finals || [])]
+  const statsMap = {}
+  allGames.forEach(game => {
+    game.log.forEach(entry => {
+      if (!entry.scorerId) return
+      if (!statsMap[entry.scorerId]) {
+        const team = state.teams.find(t => t.playerIds?.includes(entry.scorerId))
+        statsMap[entry.scorerId] = { id: entry.scorerId, name: entry.scorerName, teamName: team?.name || '', points: 0, twos: 0, threes: 0 }
+      }
+      if (entry.points === 2) { statsMap[entry.scorerId].points += 2; statsMap[entry.scorerId].twos++ }
+      if (entry.points === 3) { statsMap[entry.scorerId].points += 3; statsMap[entry.scorerId].threes++ }
+    })
+  })
+  const stats = Object.values(statsMap).sort((a, b) => b.points - a.points)
+
+  if (state.phase === 'setup') return <div className="text-muted text-center" style={{ padding: 32 }}>Start the tournament to see stats.</div>
+
+  if (stats.length === 0) return (
+    <div className="card text-center" style={{ marginTop: 16 }}>
+      <div className="text-muted">Stats will appear once scoring begins.</div>
+    </div>
+  )
+
+  return (
+    <div>
+      <div className="card">
+        <div className="section-label mb-8">Scoring Leaders</div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border)' }}>
+              {['#', 'Player', 'Team', 'PTS', '2s', '3s'].map(h => (
+                <th key={h} style={{ padding: '6px 8px', textAlign: h === 'Player' || h === 'Team' || h === '#' ? 'left' : 'right', fontFamily: 'Roboto Condensed, sans-serif', color: 'var(--espn-red)', fontWeight: 700, fontSize: '0.7rem', letterSpacing: '0.1em' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {stats.map((s, i) => (
+              <tr key={s.id} style={{ borderBottom: '1px solid var(--border)', background: i === 0 ? 'rgba(204,0,0,0.07)' : 'transparent' }}>
+                <td style={{ padding: '8px', fontFamily: 'Roboto Condensed, sans-serif', color: i === 0 ? 'var(--gold)' : 'var(--muted)', fontWeight: 700 }}>{i + 1}</td>
+                <td style={{ padding: '8px', fontFamily: 'Roboto Condensed, sans-serif', fontWeight: 900, fontSize: '0.95rem' }}>
+                  {i === 0 && <span style={{ color: 'var(--gold)', marginRight: 4 }}>★</span>}
+                  {s.name}
+                </td>
+                <td style={{ padding: '8px', fontFamily: 'Roboto Condensed, sans-serif', color: 'var(--muted)', fontSize: '0.8rem' }}>{s.teamName}</td>
+                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'Roboto Condensed, sans-serif', fontWeight: 900, fontSize: '1.1rem' }}>{s.points}</td>
+                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'Roboto Condensed, sans-serif', color: 'var(--muted-light)' }}>{s.twos}</td>
+                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'Roboto Condensed, sans-serif', color: 'var(--espn-red)', fontWeight: 700 }}>{s.threes}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
