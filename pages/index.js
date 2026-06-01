@@ -203,8 +203,13 @@ function LiveScoreView({ state }) {
           <div className="score-log">
             {[...activeGame.log].reverse().map((entry, i) => (
               <div key={i} className="score-log-entry">
-                <span style={{ color: 'var(--white)' }}>{entry.teamName}</span>
-                {' '}<span className="log-points">+{entry.points}</span>
+                <span style={{ color: 'var(--white)', fontWeight: 600 }}>
+                  {entry.scorerName || entry.teamName}
+                </span>
+                {entry.scorerName && (
+                  <span className="text-muted" style={{ fontSize: '0.75rem' }}> ({entry.teamName})</span>
+                )}
+                {' '}<span className="log-points">{entry.points > 0 ? `+${entry.points}` : entry.points}</span>
                 {' '}<span className="text-muted">→ {entry.score1} – {entry.score2}</span>
               </div>
             ))}

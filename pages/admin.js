@@ -394,28 +394,65 @@ function ScoreTab({ state, act, loading }) {
   )
 }
 
-function GameScorer({ game, state, act, loading }) {
-  const t1 = state.teams.find(t => t.id === game.team1Id)
-  const t2 = state.teams.find(t => t.id === game.team2Id)
-  const t1Winning = game.team1Score > game.team2Score
-  const t2Winning = game.team2Score > game.team1Score
-  const isComplete = game.status === 'complete'
-  const isActive = game.status === 'active' || game.status === 'pending'
-
-  const addScore = (teamSlot, points) => {
+function PlayerScoreRow({ player, teamSlot, game, act, loading, isComplete }) {
+  const addScore = (points) => {
     if (isComplete) return
-    act('ADD_SCORE', { gameId: game.id, teamSlot, points })
+    act('ADD_SCORE', {
+      gameId: game.id,
+      teamSlot,
+      points,
+      scorerName: player.name,
+      scorerId: player.id
+    })
   }
 
   return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 0', borderBottom: '1px solid var(--border)'
+    }}>
+      <div style={{
+        flex: 1, fontFamily: 'Roboto Condensed, sans-serif',
+        fontWeight: 700, fontSize: '1rem', textTransform: 'uppercase',
+        letterSpacing: '0.04em', color: 'var(--off-white)'
+      }}>
+        {player.name}
+      </div>
+      <button
+        className="score-btn plus2"
+        style={{ padding: '10px 16px', fontSize: '1.1rem', borderRadius: 3 }}
+        onClick={() => addScore(2)}
+        disabled={loading || isComplete}
+      >+2</button>
+      <button
+        className="score-btn plus3"
+        style={{ padding: '10px 16px', fontSize: '1.1rem', borderRadius: 3 }}
+        onClick={() => addScore(3)}
+        disabled={loading || isComplete}
+      >+3</button>
+    </div>
+  )
+}
+
+function GameScorer({ game, state, act, loading }) {
+  const t1 = state.teams.find(t => t.id === game.team1Id)
+  const t2 = state.teams.find(t => t.id === game.team2Id)
+  const t1Players = (t1?.playerIds || []).map(id => state.players.find(p => p.id === id)).filter(Boolean)
+  const t2Players = (t2?.playerIds || []).map(id => state.players.find(p => p.id === id)).filter(Boolean)
+  const t1Winning = game.team1Score > game.team2Score
+  const t2Winning = game.team2Score > game.team1Score
+  const isComplete = game.status === 'complete'
+
+  return (
     <div>
+      {/* Scoreboard */}
       <div className="card highlight">
         <div style={{ textAlign: 'center', marginBottom: 8 }}>
-          <span className="oswald text-muted" style={{ fontSize: '0.75rem', letterSpacing: '0.1em' }}>
+          <span style={{ fontFamily: 'Roboto Condensed, sans-serif', fontSize: '0.75rem', letterSpacing: '0.1em', color: 'var(--muted)', fontWeight: 700 }}>
             {game.round === 'final' ? `FINALS — GAME ${game.gameNumber}` : 'SEMIFINAL'}
           </span>
           {' · '}
-          <span className="oswald" style={{ fontSize: '0.75rem', color: isComplete ? 'var(--green)' : 'var(--orange)' }}>
+          <span style={{ fontFamily: 'Roboto Condensed, sans-serif', fontSize: '0.75rem', color: isComplete ? 'var(--green)' : 'var(--espn-red)', fontWeight: 700 }}>
             {isComplete ? 'FINAL' : 'FIRST TO 21'}
           </span>
         </div>
@@ -432,70 +469,72 @@ function GameScorer({ game, state, act, loading }) {
           </div>
         </div>
 
-        {!isComplete && (
-          <>
-            <hr className="divider" />
-
-            {/* Team 1 buttons */}
-            <div className="oswald text-muted mb-8" style={{ fontSize: '0.75rem', letterSpacing: '0.1em' }}>{t1?.name?.toUpperCase()}</div>
-            <div className="score-btns mb-8">
-              <button className="score-btn plus2" onClick={() => addScore('team1', 2)} disabled={loading}>+2</button>
-              <button className="score-btn plus3" onClick={() => addScore('team1', 3)} disabled={loading}>+3</button>
-              <button className="score-btn minus" onClick={() => addScore('team1', -1)} disabled={loading}>-1</button>
-            </div>
-
-            {/* Team 2 buttons */}
-            <div className="oswald text-muted mb-8" style={{ fontSize: '0.75rem', letterSpacing: '0.1em' }}>{t2?.name?.toUpperCase()}</div>
-            <div className="score-btns mb-8">
-              <button className="score-btn plus2" onClick={() => addScore('team2', 2)} disabled={loading}>+2</button>
-              <button className="score-btn plus3" onClick={() => addScore('team2', 3)} disabled={loading}>+3</button>
-              <button className="score-btn minus" onClick={() => addScore('team2', -1)} disabled={loading}>-1</button>
-            </div>
-
-            <hr className="divider" />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className="btn btn-outline btn-sm"
-                onClick={() => act('UNDO_SCORE', { gameId: game.id })}
-                disabled={loading || game.log.length === 0}
-                style={{ flex: 1 }}
-              >
-                ↩ UNDO
-              </button>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => {
-                  const winnerId = game.team1Score > game.team2Score ? game.team1Id : game.team2Id
-                  if (confirm(`Declare ${state.teams.find(t => t.id === winnerId)?.name} as winner?`)) {
-                    act('DECLARE_WINNER', { gameId: game.id, winnerId })
-                  }
-                }}
-                disabled={loading || game.team1Score === game.team2Score}
-                style={{ flex: 2 }}
-              >
-                DECLARE WINNER
-              </button>
-            </div>
-          </>
-        )}
-
         {isComplete && (
           <div style={{ textAlign: 'center', marginTop: 12 }}>
-            <span className="bracket-winner-badge" style={{ fontSize: '0.9rem', padding: '4px 12px' }}>
+            <span className="bracket-winner-badge" style={{ fontSize: '0.9rem', padding: '4px 14px' }}>
               {state.teams.find(t => t.id === game.winnerId)?.name} WINS
             </span>
           </div>
         )}
       </div>
 
-      {/* Score log */}
+      {/* Per-player scoring */}
+      {!isComplete && (
+        <>
+          {/* Team 1 players */}
+          <div className="card" style={{ marginBottom: 10 }}>
+            <div className="section-label mb-8">{t1?.name}</div>
+            {t1Players.length === 0 && <div className="text-muted" style={{ fontSize: '0.85rem' }}>No players assigned</div>}
+            {t1Players.map(p => (
+              <PlayerScoreRow key={p.id} player={p} teamSlot="team1" game={game} act={act} loading={loading} isComplete={isComplete} />
+            ))}
+          </div>
+
+          {/* Team 2 players */}
+          <div className="card" style={{ marginBottom: 10 }}>
+            <div className="section-label mb-8">{t2?.name}</div>
+            {t2Players.length === 0 && <div className="text-muted" style={{ fontSize: '0.85rem' }}>No players assigned</div>}
+            {t2Players.map(p => (
+              <PlayerScoreRow key={p.id} player={p} teamSlot="team2" game={game} act={act} loading={loading} isComplete={isComplete} />
+            ))}
+          </div>
+
+          {/* Undo + Declare Winner */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={() => act('UNDO_SCORE', { gameId: game.id })}
+              disabled={loading || game.log.length === 0}
+              style={{ flex: 1 }}
+            >↩ UNDO LAST</button>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                const winnerId = game.team1Score > game.team2Score ? game.team1Id : game.team2Id
+                if (confirm(`Declare ${state.teams.find(t => t.id === winnerId)?.name} as winner?`)) {
+                  act('DECLARE_WINNER', { gameId: game.id, winnerId })
+                }
+              }}
+              disabled={loading || game.team1Score === game.team2Score}
+              style={{ flex: 2 }}
+            >DECLARE WINNER</button>
+          </div>
+        </>
+      )}
+
+      {/* Scoring log */}
       {game.log.length > 0 && (
         <div className="card">
-          <div className="oswald mb-8" style={{ fontSize: '0.75rem', color: 'var(--muted)', letterSpacing: '0.1em' }}>SCORING LOG</div>
+          <div className="section-label mb-8">Scoring Log</div>
           <div className="score-log">
             {[...game.log].reverse().map((entry, i) => (
               <div key={i} className="score-log-entry">
-                <span style={{ color: 'var(--white)' }}>{entry.teamName}</span>
+                <span style={{ color: 'var(--white)', fontWeight: 600 }}>
+                  {entry.scorerName || entry.teamName}
+                </span>
+                {entry.scorerName && (
+                  <span className="text-muted" style={{ fontSize: '0.75rem' }}> ({entry.teamName})</span>
+                )}
                 {' '}<span className="log-points">{entry.points > 0 ? `+${entry.points}` : entry.points}</span>
                 {' '}<span className="text-muted">→ {entry.score1} – {entry.score2}</span>
               </div>

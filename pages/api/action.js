@@ -190,7 +190,7 @@ export default async function handler(req, res) {
     }
 
     case 'ADD_SCORE': {
-      const { gameId, teamSlot, points } = payload // teamSlot: 'team1' | 'team2'
+      const { gameId, teamSlot, points, scorerName, scorerId } = payload // teamSlot: 'team1' | 'team2'
       const allGames = [...state.bracket.semifinals, ...state.bracket.finals]
       const game = allGames.find(g => g.id === gameId)
       if (!game || game.status !== 'active') break
@@ -201,6 +201,8 @@ export default async function handler(req, res) {
       const team = state.teams.find(t => t.id === teamId)
       game.log.push({
         teamName: team?.name || teamSlot,
+        scorerName: scorerName || null,
+        scorerId: scorerId || null,
         points,
         score1: game.team1Score,
         score2: game.team2Score,
