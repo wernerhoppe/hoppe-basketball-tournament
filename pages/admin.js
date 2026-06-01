@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
+import { playSwish, playSwish3, playThud, playBuzzer, playFanfare } from '../utils/sounds'
 const TEAM_NAMES = [
   'The Stripling Warriors',
   'The Liahona Lakers',
@@ -18,6 +19,8 @@ export default function Admin() {
   const [tab, setTab] = useState('setup')
   const [newPlayerName, setNewPlayerName] = useState('')
   const [loading, setLoading] = useState(false)
+  const [muted, setMuted] = useState(false)
+  const prevChampionRef = useRef(null)
 
   useEffect(() => {
     const poll = async () => {
@@ -41,6 +44,21 @@ export default function Admin() {
         body: JSON.stringify({ type, payload })
       })
       const data = await res.json()
+      if (!muted) {
+        // Buzzer when a game just completed via reaching 21
+        const allGames = [...(data.bracket.semifinals || []), ...(data.bracket.finals || [])]
+        const prevAllGames = state ? [...(state.bracket.semifinals || []), ...(state.bracket.finals || [])] : []
+        const justCompleted = allGames.find(g =>
+          g.status === 'complete' &&
+          prevAllGames.find(pg => pg.id === g.id && pg.status !== 'complete')
+        )
+        if (justCompleted) playBuzzer()
+        // Fanfare when champion is newly crowned
+        if (data.championTeamId && !prevChampionRef.current) {
+          setTimeout(playFanfare, 600)
+        }
+      }
+      prevChampionRef.current = data.championTeamId
       setState(data)
     } finally {
       setLoading(false)
@@ -68,7 +86,11 @@ export default function Admin() {
         <div className="header-top">
           <span className="espn-logo">ESPN</span>
           <span style={{ color: 'white', fontSize: '0.75rem', fontFamily: 'Roboto Condensed, sans-serif', letterSpacing: '0.1em', fontWeight: 700 }}>ADMIN CONTROL</span>
-          <span style={{ width: 40 }} />
+          <button
+            onClick={() => setMuted(m => !m)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.1rem', padding: '2px 4px' }}
+            title={muted ? 'Unmute sounds' : 'Mute sounds'}
+          >{muted ? '🔇' : '🔊'}</button>
         </div>
         <div className="header-main">
           <h1>🏀 Hoppe Family Tournament</h1>
@@ -96,7 +118,7 @@ export default function Admin() {
         )}
 
         {tab === 'score' && (
-          <ScoreTab state={state} act={act} loading={loading} />
+          <ScoreTab state={state} act={act} loading={loading} muted={muted} />
         )}
 
         {tab === 'bracket' && (
@@ -333,7 +355,7 @@ function TeamBlock({ team, state, act, loading, unassignedPlayers }) {
 
 // ─── SCORE TAB ───────────────────────────────────────────────────────────────
 
-function ScoreTab({ state, act, loading }) {
+function ScoreTab({ state, act, loading, muted }) {
   const allGames = [...(state.bracket.semifinals || []), ...(state.bracket.finals || [])]
   const activeGame = allGames.find(g => g.id === state.activeGameId)
   const [selectedGameId, setSelectedGameId] = useState(null)
@@ -386,7 +408,7 @@ function ScoreTab({ state, act, loading }) {
       </div>
 
       {displayGame ? (
-        <GameScorer game={displayGame} state={state} act={act} loading={loading} />
+        <GameScorer game={displayGame} state={state} act={act} loading={loading} muted={muted} />
       ) : (
         <div className="text-muted text-center" style={{ padding: 24 }}>Select a game above to score it.</div>
       )}
@@ -394,9 +416,14 @@ function ScoreTab({ state, act, loading }) {
   )
 }
 
-function PlayerScoreRow({ player, teamSlot, game, act, loading, isComplete }) {
+function PlayerScoreRow({ player, teamSlot, game, act, loading, isComplete, muted }) {
   const addScore = (points) => {
     if (isComplete) return
+    if (!muted) {
+      if (points === 3) playSwish3()
+      else if (points === 2) playSwish()
+      else if (points < 0) playThud()
+    }
     act('ADD_SCORE', {
       gameId: game.id,
       teamSlot,
@@ -434,7 +461,7 @@ function PlayerScoreRow({ player, teamSlot, game, act, loading, isComplete }) {
   )
 }
 
-function GameScorer({ game, state, act, loading }) {
+function GameScorer({ game, state, act, loading, muted }) {
   const t1 = state.teams.find(t => t.id === game.team1Id)
   const t2 = state.teams.find(t => t.id === game.team2Id)
   const t1Players = (t1?.playerIds || []).map(id => state.players.find(p => p.id === id)).filter(Boolean)
@@ -486,7 +513,7 @@ function GameScorer({ game, state, act, loading }) {
             <div className="section-label mb-8">{t1?.name}</div>
             {t1Players.length === 0 && <div className="text-muted" style={{ fontSize: '0.85rem' }}>No players assigned</div>}
             {t1Players.map(p => (
-              <PlayerScoreRow key={p.id} player={p} teamSlot="team1" game={game} act={act} loading={loading} isComplete={isComplete} />
+              <PlayerScoreRow key={p.id} player={p} teamSlot="team1" game={game} act={act} loading={loading} isComplete={isComplete} muted={muted} />
             ))}
           </div>
 
@@ -495,7 +522,7 @@ function GameScorer({ game, state, act, loading }) {
             <div className="section-label mb-8">{t2?.name}</div>
             {t2Players.length === 0 && <div className="text-muted" style={{ fontSize: '0.85rem' }}>No players assigned</div>}
             {t2Players.map(p => (
-              <PlayerScoreRow key={p.id} player={p} teamSlot="team2" game={game} act={act} loading={loading} isComplete={isComplete} />
+              <PlayerScoreRow key={p.id} player={p} teamSlot="team2" game={game} act={act} loading={loading} isComplete={isComplete} muted={muted} />
             ))}
           </div>
 
@@ -512,6 +539,7 @@ function GameScorer({ game, state, act, loading }) {
               onClick={() => {
                 const winnerId = game.team1Score > game.team2Score ? game.team1Id : game.team2Id
                 if (confirm(`Declare ${state.teams.find(t => t.id === winnerId)?.name} as winner?`)) {
+                  if (!muted) playBuzzer()
                   act('DECLARE_WINNER', { gameId: game.id, winnerId })
                 }
               }}
