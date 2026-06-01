@@ -217,7 +217,7 @@ function SetupTab({ state, act, newPlayerName, setNewPlayerName, unassignedPlaye
           {canStart ? '🏀 START TOURNAMENT' : 'Need at least 2 teams with players'}
         </button>
       ) : (
-        <div className="card" style={{ border: '1px solid var(--red)', background: 'rgba(231,76,60,0.08)' }}>
+        <div className="card" style={{ border: '1px solid var(--espn-red)', background: 'rgba(204,0,0,0.08)' }}>
           <div className="oswald text-muted mb-8" style={{ fontSize: '0.75rem', letterSpacing: '0.1em' }}>DANGER ZONE</div>
           <div className="text-muted mb-8" style={{ fontSize: '0.85rem' }}>This will erase all scores, games, and bracket progress.</div>
           <button
@@ -235,12 +235,21 @@ function SetupTab({ state, act, newPlayerName, setNewPlayerName, unassignedPlaye
 
 function TeamBlock({ team, state, act, loading, unassignedPlayers }) {
   const [teamName, setTeamName] = useState(team.name)
+  const [isFocused, setIsFocused] = useState(false)
   const [showNamePicker, setShowNamePicker] = useState(false)
   const [assignPlayerId, setAssignPlayerId] = useState('')
 
+  // Sync if name changed externally (e.g. via name picker on another device) — but not while user is typing
+  useEffect(() => {
+    if (!isFocused) setTeamName(team.name)
+  }, [team.name, isFocused])
+
   const saveName = () => {
-    if (teamName.trim() !== team.name) {
+    setIsFocused(false)
+    if (teamName.trim() && teamName.trim() !== team.name) {
       act('RENAME_TEAM', { teamId: team.id, name: teamName.trim() })
+    } else {
+      setTeamName(team.name) // revert if blank
     }
   }
 
@@ -261,6 +270,7 @@ function TeamBlock({ team, state, act, loading, unassignedPlayers }) {
           className="team-name-input"
           value={teamName}
           onChange={e => setTeamName(e.target.value)}
+          onFocus={() => setIsFocused(true)}
           onBlur={saveName}
           onKeyDown={e => e.key === 'Enter' && saveName()}
           style={{ flex: 1, marginRight: 8 }}
@@ -317,7 +327,9 @@ function TeamBlock({ team, state, act, loading, unassignedPlayers }) {
                 style={{ width: 'auto', padding: '4px 8px', fontSize: '0.8rem' }}
                 value=""
                 onChange={e => {
-                  if (e.target.value) act('ASSIGN_PLAYER', { playerId: p.id, teamId: e.target.value || null })
+                  if (!e.target.value) return
+                  const teamId = e.target.value === '__unassign' ? null : e.target.value
+                  act('ASSIGN_PLAYER', { playerId: p.id, teamId })
                 }}
               >
                 <option value="">Move to...</option>
@@ -361,6 +373,16 @@ function ScoreTab({ state, act, loading, muted }) {
   const allGames = [...(state.bracket.semifinals || []), ...(state.bracket.finals || [])]
   const activeGame = allGames.find(g => g.id === state.activeGameId)
   const [selectedGameId, setSelectedGameId] = useState(null)
+
+  // Auto-clear selection if selected game completes — fall back to active game
+  useEffect(() => {
+    if (selectedGameId) {
+      const sel = allGames.find(g => g.id === selectedGameId)
+      if (sel?.status === 'complete' && state.activeGameId && state.activeGameId !== selectedGameId) {
+        setSelectedGameId(null)
+      }
+    }
+  }, [state.activeGameId, selectedGameId])
 
   const displayGame = selectedGameId
     ? allGames.find(g => g.id === selectedGameId)

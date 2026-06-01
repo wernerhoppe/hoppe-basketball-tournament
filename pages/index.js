@@ -30,8 +30,8 @@ export default function Viewer() {
       try {
         const res = await fetch('/api/state')
         const data = await res.json()
-        // Fire confetti when champion is first detected
-        if (data.championTeamId && !prevChampionRef.current && !confettiFiredRef.current) {
+        // Fire confetti when champion first detected (including on fresh page load if already complete)
+        if (data.championTeamId && !confettiFiredRef.current) {
           confettiFiredRef.current = true
           fireConfetti()
         }

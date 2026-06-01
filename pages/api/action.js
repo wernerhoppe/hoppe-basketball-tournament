@@ -54,8 +54,8 @@ function makeGame(id, round, team1Id, team2Id, gameNumber = 1) {
 function advanceBracket(state) {
   const { bracket, teams } = state
 
-  // Check if all semifinals are done
-  const sfsComplete = bracket.semifinals.every(g => g.status === 'complete')
+  // Check if all semifinals are done (guard: must have at least one semifinal)
+  const sfsComplete = bracket.semifinals.length > 0 && bracket.semifinals.every(g => g.status === 'complete')
 
   if (sfsComplete && bracket.finals.length === 0) {
     let t1, t2
@@ -230,18 +230,19 @@ export default async function handler(req, res) {
       const { gameId } = payload
       const allGames = [...state.bracket.semifinals, ...state.bracket.finals]
       const game = allGames.find(g => g.id === gameId)
-      if (!game || game.log.length === 0) break
+      if (!game || game.log.length === 0 || game.status === 'complete') break
       game.log.pop()
-      // Recalculate scores from remaining log
-      const t1Name = state.teams.find(t => t.id === game.team1Id)?.name
+      // Recalculate scores from remaining log using team1Id as truth (not name, which can change)
       game.team1Score = 0
       game.team2Score = 0
       game.log.forEach(entry => {
-        if (entry.teamName === t1Name) game.team1Score += entry.points
-        else game.team2Score += entry.points
+        // scorerId belongs to team1 if their team's playerIds includes it
+        const isTeam1 = entry.scorerId
+          ? state.teams.find(t => t.id === game.team1Id)?.playerIds?.includes(entry.scorerId)
+          : entry.teamName === state.teams.find(t => t.id === game.team1Id)?.name
+        if (isTeam1) game.team1Score = Math.max(0, game.team1Score + entry.points)
+        else game.team2Score = Math.max(0, game.team2Score + entry.points)
       })
-      game.team1Score = Math.max(0, game.team1Score)
-      game.team2Score = Math.max(0, game.team2Score)
       break
     }
 
