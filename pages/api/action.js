@@ -7,7 +7,9 @@ const DEFAULT_STATE = {
   teams: [],
   bracket: { semifinals: [], finals: [] },
   activeGameId: null,
-  championTeamId: null
+  championTeamId: null,
+  potPerPlayer: 2,
+  announcement: ''
 }
 
 function uid() {
@@ -259,6 +261,17 @@ export default async function handler(req, res) {
         next.status = 'active'
         state.activeGameId = next.id
       }
+      break
+    }
+
+    case 'SET_POT': {
+      const amount = parseFloat(payload.amount)
+      if (!isNaN(amount) && amount >= 0) state.potPerPlayer = amount
+      break
+    }
+
+    case 'SET_ANNOUNCEMENT': {
+      state.announcement = payload.text || ''
       break
     }
 

@@ -71,7 +71,9 @@ export default function Admin() {
     </div>
   )
 
-  const prizePool = state.players.length * 2
+  const uniquePlayerCount = state.players.length
+  const potPerPlayer = state.potPerPlayer ?? 2
+  const prizePool = uniquePlayerCount * potPerPlayer
   const unassignedPlayers = state.players.filter(p => !p.teamId)
 
   return (
@@ -94,9 +96,14 @@ export default function Admin() {
         </div>
         <div className="header-main">
           <h1>🏀 Hoppe Family Tournament</h1>
-          <div className="prize-badge">Prize Pot: ${prizePool}</div>
+          <div className="prize-badge">Prize Pot: ${prizePool.toFixed(2).replace(/\.00$/, '')}</div>
         </div>
       </div>
+      {state.announcement && (
+        <div style={{ background: 'var(--espn-red)', padding: '6px 16px', textAlign: 'center', fontFamily: 'Roboto Condensed, sans-serif', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.04em', color: 'white' }}>
+          📢 {state.announcement}
+        </div>
+      )}
 
       <div className="container">
         <div className="tabs mt-8">
@@ -131,6 +138,90 @@ export default function Admin() {
   )
 }
 
+// ─── POT + ANNOUNCEMENT HELPERS ──────────────────────────────────────────────
+
+function CustomPotInput({ current, act, loading }) {
+  const [custom, setCustom] = useState('')
+  const [editing, setEditing] = useState(false)
+  const presets = [0, 1, 2, 5, 10]
+  const isCustom = !presets.includes(current)
+
+  if (!editing && !isCustom) {
+    return (
+      <button className="btn btn-outline btn-sm" onClick={() => setEditing(true)} disabled={loading}>
+        Custom
+      </button>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+      <span style={{ color: 'var(--muted)', fontFamily: 'Roboto Condensed, sans-serif', fontWeight: 700 }}>$</span>
+      <input
+        className="input"
+        style={{ width: 64, padding: '6px 8px', fontSize: '0.9rem', textAlign: 'center' }}
+        placeholder={isCustom ? String(current) : '0'}
+        value={custom}
+        autoFocus
+        onChange={e => setCustom(e.target.value.replace(/[^0-9.]/g, ''))}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { act('SET_POT', { amount: custom }); setCustom(''); setEditing(false) }
+          if (e.key === 'Escape') { setCustom(''); setEditing(false) }
+        }}
+      />
+      <button className="btn btn-primary btn-sm" onClick={() => { act('SET_POT', { amount: custom }); setCustom(''); setEditing(false) }} disabled={!custom || loading}>SET</button>
+    </div>
+  )
+}
+
+function AnnouncementEditor({ state, act, loading }) {
+  const [text, setText] = useState(state.announcement || '')
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    // Sync if cleared externally
+    if (!state.announcement) setText('')
+  }, [state.announcement])
+
+  const save = () => {
+    act('SET_ANNOUNCEMENT', { text: text.trim() })
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const clear = () => {
+    setText('')
+    act('SET_ANNOUNCEMENT', { text: '' })
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <div className="section-label mb-8">📢 Announcement Banner</div>
+      <div className="text-muted mb-8" style={{ fontSize: '0.8rem' }}>Shows on all viewer screens. Use for fill-ins, rule changes, etc.</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          className="input"
+          placeholder='e.g. "Tyler filling in for Zion Dunkers in finals"'
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && save()}
+        />
+        <button className="btn btn-primary btn-sm" onClick={save} disabled={loading || !text.trim()}>
+          {saved ? '✓' : 'POST'}
+        </button>
+        {state.announcement && (
+          <button className="btn btn-outline btn-sm" onClick={clear} disabled={loading}>✕</button>
+        )}
+      </div>
+      {state.announcement && (
+        <div style={{ marginTop: 8, padding: '6px 10px', background: 'rgba(204,0,0,0.1)', border: '1px solid var(--espn-red)', borderRadius: 4, fontSize: '0.85rem', color: 'var(--off-white)' }}>
+          Live: "{state.announcement}"
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── SETUP TAB ───────────────────────────────────────────────────────────────
 
 function SetupTab({ state, act, newPlayerName, setNewPlayerName, unassignedPlayers, prizePool, loading }) {
@@ -146,12 +237,32 @@ function SetupTab({ state, act, newPlayerName, setNewPlayerName, unassignedPlaye
 
   return (
     <div>
-      {/* Prize Pool */}
+      {/* Prize Pool + Pot Config */}
       <div className="card gold" style={{ textAlign: 'center' }}>
-        <div className="oswald text-muted" style={{ fontSize: '0.75rem', letterSpacing: '0.15em' }}>PRIZE POOL</div>
-        <div className="oswald text-gold" style={{ fontSize: '2.5rem' }}>${prizePool}</div>
-        <div className="text-muted" style={{ fontSize: '0.8rem' }}>{state.players.length} players × $2</div>
+        <div className="section-label" style={{ color: 'var(--gold)', marginBottom: 4 }}>PRIZE POOL</div>
+        <div style={{ fontFamily: 'Roboto Condensed, sans-serif', fontSize: '2.5rem', fontWeight: 900, color: 'var(--gold-bright)' }}>${prizePool.toFixed(2).replace(/\.00$/, '')}</div>
+        <div className="text-muted" style={{ fontSize: '0.8rem', marginBottom: 12 }}>
+          {state.players.length} player{state.players.length !== 1 ? 's' : ''} × ${state.potPerPlayer ?? 2}
+        </div>
+        {/* Pot amount selector */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {[0, 1, 2, 5, 10].map(amt => (
+            <button
+              key={amt}
+              className={`btn btn-sm${(state.potPerPlayer ?? 2) === amt ? ' btn-gold' : ' btn-outline'}`}
+              style={{ minWidth: 44 }}
+              onClick={() => act('SET_POT', { amount: amt })}
+              disabled={loading}
+            >
+              {amt === 0 ? 'Free' : `$${amt}`}
+            </button>
+          ))}
+          <CustomPotInput current={state.potPerPlayer ?? 2} act={act} loading={loading} />
+        </div>
       </div>
+
+      {/* Announcement banner */}
+      <AnnouncementEditor state={state} act={act} loading={loading} />
 
       {/* Add players — always visible */}
       <div className="card">
@@ -317,9 +428,14 @@ function TeamBlock({ team, state, act, loading, unassignedPlayers }) {
         {teamPlayers.length === 0 && (
           <div className="text-muted" style={{ fontSize: '0.85rem' }}>No players on this team</div>
         )}
-        {teamPlayers.map(p => (
+        {teamPlayers.map(p => {
+          const isShared = state.teams.filter(t => t.playerIds.includes(p.id)).length > 1
+          return (
           <div key={p.id} className="row-between" style={{ padding: '4px 0' }}>
-            <span className="player-pill" style={{ margin: 0 }}>{p.name}</span>
+            <span className="player-pill" style={{ margin: 0, borderColor: isShared ? 'var(--gold)' : undefined }}>
+              {p.name}
+              {isShared && <span style={{ fontSize: '0.65rem', background: 'var(--gold)', color: '#111', borderRadius: 3, padding: '1px 4px', fontWeight: 700, marginLeft: 2 }}>2-TEAM</span>}
+            </span>
             <div className="row gap-8">
               {/* Move to different team */}
               <select
@@ -340,7 +456,8 @@ function TeamBlock({ team, state, act, loading, unassignedPlayers }) {
               </select>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Add player to team */}

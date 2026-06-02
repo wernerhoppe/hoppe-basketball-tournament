@@ -50,9 +50,17 @@ export default function Viewer() {
     </div>
   )
 
-  const prizePool = state.players.length * 2
+  const potPerPlayer = state.potPerPlayer ?? 2
+  const prizePool = state.players.length * potPerPlayer
   const champion = state.championTeamId ? state.teams.find(t => t.id === state.championTeamId) : null
   const stats = calcStats(state)
+
+  // Shared player detection — any player on 2+ teams
+  const sharedPlayerIds = new Set(
+    state.players.filter(p =>
+      state.teams.filter(t => t.playerIds?.includes(p.id)).length > 1
+    ).map(p => p.id)
+  )
 
   return (
     <>
@@ -75,6 +83,13 @@ export default function Viewer() {
         </div>
       </div>
 
+      {/* Announcement banner */}
+      {state.announcement && (
+        <div style={{ background: 'var(--espn-red)', padding: '8px 16px', textAlign: 'center', fontFamily: 'Roboto Condensed, sans-serif', fontWeight: 700, fontSize: '0.9rem', letterSpacing: '0.04em', color: 'white' }}>
+          📢 {state.announcement}
+        </div>
+      )}
+
       <div className="container">
         {state.phase === 'setup' && (
           <div className="card text-center" style={{ marginTop: 24 }}>
@@ -90,7 +105,7 @@ export default function Viewer() {
             <span className="trophy">🏆</span>
             <div className="champion-name">{champion.name}</div>
             <div className="text-center text-gold" style={{ fontFamily: 'Roboto Condensed, sans-serif', fontSize: '1.1rem', marginTop: 8, fontWeight: 700 }}>CHAMPIONS</div>
-            <div className="text-center mt-8" style={{ fontSize: '1.5rem', color: 'var(--gold-bright)', fontFamily: 'Roboto Condensed, sans-serif', fontWeight: 900 }}>${prizePool} Prize Pot</div>
+            <div className="text-center mt-8" style={{ fontSize: '1.5rem', color: 'var(--gold-bright)', fontFamily: 'Roboto Condensed, sans-serif', fontWeight: 900 }}>${prizePool.toFixed(2).replace(/\.00$/, '')} Prize Pot</div>
             <div className="text-center text-muted mt-8">
               {state.teams.find(t => t.id === champion.id)?.playerIds.map(pid => {
                 const p = state.players.find(pl => pl.id === pid)
@@ -112,7 +127,7 @@ export default function Viewer() {
             {tab === 'bracket' && <BracketView state={state} />}
             {tab === 'scores' && <LiveScoreView state={state} />}
             {tab === 'stats' && <StatsView stats={stats} />}
-            {tab === 'teams' && <TeamsView state={state} />}
+            {tab === 'teams' && <TeamsView state={state} sharedPlayerIds={sharedPlayerIds} />}
           </>
         )}
 
@@ -298,7 +313,7 @@ function StatsView({ stats }) {
   )
 }
 
-function TeamsView({ state }) {
+function TeamsView({ state, sharedPlayerIds }) {
   return (
     <div>
       {state.teams.map(team => (
@@ -307,7 +322,14 @@ function TeamsView({ state }) {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {team.playerIds.map(pid => {
               const p = state.players.find(pl => pl.id === pid)
-              return p ? <span key={pid} className="player-pill">{p.name}</span> : null
+              if (!p) return null
+              const isShared = sharedPlayerIds?.has(pid)
+              return (
+                <span key={pid} className="player-pill" style={isShared ? { borderColor: 'var(--gold)', color: 'var(--gold)' } : {}}>
+                  {p.name}
+                  {isShared && <span style={{ fontSize: '0.65rem', background: 'var(--gold)', color: '#111', borderRadius: 3, padding: '1px 4px', fontWeight: 700, marginLeft: 2 }}>2-TEAM</span>}
+                </span>
+              )
             })}
             {team.playerIds.length === 0 && <span className="text-muted">No players assigned</span>}
           </div>
